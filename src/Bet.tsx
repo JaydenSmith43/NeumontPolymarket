@@ -219,9 +219,9 @@ export default function Bet(props: BetProps) {
               onClick={handleBetSubmit}
               disabled={
                 isSubmitting ||
-                betAmount === 0 ||
+                !betAmount ||
                 betAmount <= 0 ||
-                (profile !== null && betAmount > profile.balance)
+                (profile && betAmount > profile.balance)
               }
             >
               {isSubmitting
