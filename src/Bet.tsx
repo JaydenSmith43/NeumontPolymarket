@@ -214,7 +214,7 @@ export default function Bet(props: BetProps) {
               onClick={handleBetSubmit}
               disabled={isSubmitting || !betAmount || betAmount <= 0 || (profile && betAmount > profile.balance)}
             >
-              {isSubmitting ? 'Placing Bet...' : `Bet ${showBetInput ? showBetInput.toUpperCase() : ''}`}
+              {isSubmitting ? 'Placing Bet...' : `Bet ${showBetInput?.toUpperCase() || ''}`}
             </button>
             <button
               className="rounded px-4 py-2 text-sm font-semibold bg-transparent text-[#f5f5f5]/80 border border-[#f5f5f5]/20 hover:bg-[#f5f5f5]/10 transition-colors"
