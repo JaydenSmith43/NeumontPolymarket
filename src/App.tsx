@@ -1,36 +1,34 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
 import Bet from "./Bet";
+import Navigation from "./components/Navigation";
+import { AuthProvider } from "./context/AuthContext";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [balance] = useState(1000);
 
   return (
-    <>
-      <div>
-        <Bet headline="Will Professor Maple show up late tomorrow?" />
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <AuthProvider>
+      <div className="flex flex-col min-h-screen">
+        <Navigation balance={balance} />
+
+        <main className="flex-1 p-8 flex justify-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-[1600px] w-full">
+            <Bet headline="Will Professor Maple show up late tomorrow?" />
+            <Bet headline="Beardall will be next professor to call out sick" />
+            <Bet headline="Aaron Reed will be seen in the commons by Thursday" />
+            <Bet headline="Fire alarm goes off by the end of next week" />
+            <Bet headline="Weekly email is late" />
+          </div>
+        </main>
+
+        <footer className="bg-[#333333] py-4 px-4 text-center text-sm text-white/70 border-t-2 border-[#f1c40f]">
+          <p>
+            © 2023 <span className="text-[#f1c40f]">NEUMONT POLYMARKET</span> -
+            Trade on campus predictions
+          </p>
+        </footer>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </AuthProvider>
   );
 }
 
