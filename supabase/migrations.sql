@@ -1,8 +1,5 @@
 -- Create tables and functions for Neumont Polymarket
 
--- Enable Row Level Security (RLS)
-ALTER DATABASE postgres SET "app.settings.jwt_secret" TO 'your-jwt-secret';
-
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -99,12 +96,10 @@ BEGIN
   UPDATE public.bets
   SET resolved = TRUE, outcome = bet_outcome
   WHERE id = bet_id;
-  
   -- Calculate the total amount bet
   SELECT (yes_votes + no_votes) INTO total_amount
   FROM public.bets
   WHERE id = bet_id;
-  
   -- Distribute winnings to users who bet correctly
   FOR user_record IN
     SELECT user_id, amount
@@ -113,7 +108,6 @@ BEGIN
   LOOP
     -- Calculate the winning amount (original bet + proportional share of losing pool)
     winning_amount := user_record.amount * 2; -- Simplified calculation
-    
     -- Update user balance
     PERFORM public.update_user_balance(user_record.user_id, winning_amount);
   END LOOP;
@@ -125,29 +119,29 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Profiles table policies
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view their own profile" 
-  ON public.profiles FOR SELECT 
+CREATE POLICY "Users can view their own profile"
+  ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
-CREATE POLICY "Users can update their own profile" 
-  ON public.profiles FOR UPDATE 
+CREATE POLICY "Users can update their own profile"
+  ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
 
 -- Bets table policies
 ALTER TABLE public.bets ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Anyone can view bets" 
-  ON public.bets FOR SELECT 
+CREATE POLICY "Anyone can view bets"
+  ON public.bets FOR SELECT
   TO authenticated, anon
   USING (true);
 
-CREATE POLICY "Authenticated users can create bets" 
-  ON public.bets FOR INSERT 
+CREATE POLICY "Authenticated users can create bets"
+  ON public.bets FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
-CREATE POLICY "Admin users can update bets" 
-  ON public.bets FOR UPDATE 
+CREATE POLICY "Admin users can update bets"
+  ON public.bets FOR UPDATE
   TO authenticated
   USING (auth.uid() = created_by OR
          EXISTS (
@@ -158,12 +152,12 @@ CREATE POLICY "Admin users can update bets"
 -- User bets table policies
 ALTER TABLE public.user_bets ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view their own bets" 
-  ON public.user_bets FOR SELECT 
+CREATE POLICY "Users can view their own bets"
+  ON public.user_bets FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can create their own bets" 
-  ON public.user_bets FOR INSERT 
+CREATE POLICY "Users can create their own bets"
+  ON public.user_bets FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
