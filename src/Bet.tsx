@@ -221,7 +221,8 @@ export default function Bet(props: BetProps) {
                 isSubmitting ||
                 !betAmount ||
                 betAmount <= 0 ||
-                (profile && betAmount > profile.balance)
+                (profile && betAmount > profile.balance) ||
+                showBetInput === null
               }
             >
               {isSubmitting
