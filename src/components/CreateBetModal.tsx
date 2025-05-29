@@ -41,15 +41,30 @@ export default function CreateBetModal({
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
       
-      // Create the bet
-      const { error: insertError } = await supabase.from('bets').insert({
+      console.log('Creating bet with payload:', {
         headline: headline.trim(),
-        yes_votes: 3, // Starting with some minimal votes
-        no_votes: 7,
+        yes_votes: 0,
+        no_votes: 0,
         created_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
         created_by: user.id
       });
+
+      // Create the bet
+      const { data, error: insertError } = await supabase
+        .from('bets')
+        .insert({
+          headline: headline.trim(),
+          yes_votes: 0,
+          no_votes: 0,
+          created_at: new Date().toISOString(),
+          expires_at: expiresAt.toISOString(),
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      console.log('Insert response:', { data, insertError });
       
       if (insertError) {
         throw insertError;
@@ -67,7 +82,7 @@ export default function CreateBetModal({
       
     } catch (err: unknown) {
       const error = err as Error;
-      console.error('Error creating bet:', err);
+      console.error('Error creating bet:', error);
       setError(error.message || 'Failed to create bet');
     } finally {
       setIsSubmitting(false);

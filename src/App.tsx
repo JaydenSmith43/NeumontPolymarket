@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Bet from "./Bet";
 import Navigation from "./components/Navigation";
 import { AuthProvider } from "./context/AuthContext";
@@ -13,35 +13,56 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateBetModalOpen, setIsCreateBetModalOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, session, isLoading: authLoading } = useAuth();
 
-  const fetchBets = async () => {
+  console.log("AppContent render, authLoading:", authLoading);
+
+  const fetchBets = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const { data, error } = await supabase
+      console.log("Fetching bets");
+      console.log("Current user:", user);
+      console.log("Current session:", session);
+      
+      // Fetch the bets
+      const { data: bets, error } = await supabase
         .from('bets')
         .select('*')
         .order('created_at', { ascending: false });
         
+      console.log("Fetch result:", { bets, error });
+      
       if (error) {
+        console.error("Error fetching bets:", error);
         throw error;
       }
       
-      setBets(data as BetType[]);
+      setBets(bets as BetType[]);
     } catch (err: unknown) {
       const error = err as Error;
-      console.error('Error fetching bets:', err);
+      console.error("Error in fetchBets:", error);
       setError(error.message || 'Failed to fetch bets');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, session]);
 
   useEffect(() => {
-    fetchBets();
-  }, []);
+    if (!authLoading) {
+      fetchBets();
+    }
+  }, [authLoading, fetchBets]);
+
+  // Show loading state while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-4 border-[#f1c40f]/20 border-t-[#f1c40f] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

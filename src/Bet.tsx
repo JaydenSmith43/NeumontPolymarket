@@ -7,50 +7,80 @@ export interface BetProps {
   betId?: string;
 }
 
+const PRESET_AMOUNTS = [5, 10, 25, 50, 100, 250, 500, 1000];
+
 export default function Bet(props: BetProps) {
   const [votes, setVotes] = useState({ yes: 50, no: 50 });
   const [betAmount, setBetAmount] = useState<number>(10);
   const [showBetInput, setShowBetInput] = useState<"yes" | "no" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userBet, setUserBet] = useState<{ position: 'yes' | 'no' | null; amount: number | null }>({ position: null, amount: null });
   const { user, profile, refreshProfile } = useAuth();
 
-  // Fetch real vote data from Supabase on mount
+  // Fetch real vote data and user's existing bet from Supabase on mount
   useEffect(() => {
-    const fetchVotes = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
+        // Fetch votes
+        const { data: votesData, error: votesError } = await supabase
           .from("bets")
           .select("yes_votes, no_votes")
           .eq("id", props.betId)
           .single();
 
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 means no rows returned
-          console.error("Error fetching votes:", error);
+        if (votesError && votesError.code !== "PGRST116") {
+          console.error("Error fetching votes:", votesError);
           return;
         }
 
-        if (data) {
-          const total = data.yes_votes + data.no_votes;
+        if (votesData) {
+          const total = votesData.yes_votes + votesData.no_votes;
           if (total > 0) {
             setVotes({
-              yes: Math.round((data.yes_votes / total) * 100),
-              no: Math.round((data.no_votes / total) * 100),
+              yes: Math.round((votesData.yes_votes / total) * 100),
+              no: Math.round((votesData.no_votes / total) * 100),
+            });
+          }
+        }
+
+        // Fetch user's existing bet if logged in
+        if (user) {
+          const { data: betData, error: betError } = await supabase
+            .from("user_bets")
+            .select("position, amount")
+            .eq("user_id", user.id)
+            .eq("bet_id", props.betId)
+            .single();
+
+          if (betError && betError.code !== "PGRST116") {
+            console.error("Error fetching user bet:", betError);
+            return;
+          }
+
+          if (betData) {
+            setUserBet({
+              position: betData.position as 'yes' | 'no',
+              amount: betData.amount
             });
           }
         }
       } catch (err) {
-        console.error("Error in fetchVotes:", err);
+        console.error("Error in fetchData:", err);
       }
     };
 
-    fetchVotes();
+    fetchData();
   }, [props.betId, props.headline, user?.id]);
 
   const handleBetStart = (type: "yes" | "no") => {
     if (!user) {
       setError("Please sign in to place a bet");
+      return;
+    }
+
+    if (userBet.position) {
+      setError(`You have already placed a bet on ${userBet.position.toUpperCase()}`);
       return;
     }
 
@@ -95,6 +125,9 @@ export default function Bet(props: BetProps) {
         .single();
 
       if (userBetError) {
+        if (userBetError.code === '23505') { // Unique violation error code
+          throw new Error("You have already placed a bet on this prediction");
+        }
         throw userBetError;
       }
 
@@ -135,6 +168,12 @@ export default function Bet(props: BetProps) {
           no: Math.round((updatedBet.no_votes / total) * 100)
         });
       }
+      
+      // Update user bet state
+      setUserBet({
+        position: showBetInput,
+        amount: betAmount
+      });
       
       // Refresh user profile to update balance
       await refreshProfile();
@@ -182,16 +221,42 @@ export default function Bet(props: BetProps) {
         <div className="w-[45px] text-right font-semibold text-[#f5f5f5]">{votes.no}%</div>
       </div>
       
+      {userBet.position && (
+        <div className="mb-4 p-2 bg-[#f1c40f]/10 border border-[#f1c40f]/30 rounded text-sm text-[#f1c40f]">
+          You bet {userBet.amount} NTC on {userBet.position.toUpperCase()}
+        </div>
+      )}
+      
       {error && (
         <div className="mb-4 p-2 bg-red-500/20 border border-red-500/30 rounded text-sm text-red-200">
           {error}
         </div>
       )}
       
-      {showBetInput !== null ? (
+      {showBetInput ? (
         <div className="mt-4 mb-4">
-          <div className="flex items-center mb-2">
-            <span className="text-[#f5f5f5] mr-2">Bet amount:</span>
+          <div className="mb-4">
+            <div className="text-[#f5f5f5] mb-2">Select bet amount:</div>
+            <div className="grid grid-cols-4 gap-2">
+              {PRESET_AMOUNTS.map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setBetAmount(amount)}
+                  className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                    betAmount === amount
+                      ? 'bg-[#f1c40f] text-[#222222]'
+                      : 'bg-[#333333] text-[#f5f5f5] hover:bg-[#444444]'
+                  } ${amount > (profile?.balance || 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={amount > (profile?.balance || 0)}
+                >
+                  {amount}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex items-center mb-4">
+            <span className="text-[#f5f5f5] mr-2">Custom amount:</span>
             <input
               type="number"
               min="1"
@@ -202,13 +267,14 @@ export default function Bet(props: BetProps) {
             />
             <span className="ml-2 text-[#f5f5f5]/70">NTC</span>
           </div>
+          
           <div className="flex gap-2 mt-3">
             <button
-              className="flex-1 rounded px-4 py-2 text-sm font-semibold bg-[#f1c40f] text-[#222222] border border-[#f1c40f] disabled:opacity-50"
+              className="flex-1 rounded px-4 py-2 text-sm font-semibold bg-[#f1c40f] text-[#222222] border border-[#f1c40f] disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleBetSubmit}
-              disabled={isSubmitting || betAmount <= 0 || !(profile && betAmount > profile.balance)}
+              disabled={isSubmitting || betAmount <= 0 || !profile || betAmount > profile.balance}
             >
-              {isSubmitting ? 'Placing Bet...' : `Bet ${showBetInput ? showBetInput.toUpperCase() : ''}`}
+              {isSubmitting ? 'Placing Bet...' : `Bet ${showBetInput.toUpperCase()}`}
             </button>
             <button
               className="rounded px-4 py-2 text-sm font-semibold bg-transparent text-[#f5f5f5]/80 border border-[#f5f5f5]/20 hover:bg-[#f5f5f5]/10 transition-colors"
@@ -222,16 +288,28 @@ export default function Bet(props: BetProps) {
       ) : (
         <div className="flex justify-around mt-7 gap-3">
           <button
-            className="flex-1 rounded px-5 py-3 text-base font-semibold cursor-pointer transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-[#f1c40f]/60 bg-[#f1c40f] text-[#222222] border border-[#f1c40f]"
+            className={`flex-1 rounded px-5 py-3 text-base font-semibold cursor-pointer transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-[#f1c40f]/60 ${
+              userBet.position 
+                ? 'bg-[#444444] text-[#f5f5f5]/50 cursor-not-allowed border border-[#f5f5f5]/20'
+                : 'bg-[#f1c40f] text-[#222222] border border-[#f1c40f]'
+            }`}
             onClick={() => handleShowBetInput("yes")}
+            disabled={!!userBet.position}
+            title={userBet.position ? "You have already placed a bet" : "Bet YES"}
           >
-            Yes
+            {userBet.position === 'yes' ? "Your Bet: YES" : "Yes"}
           </button>
           <button
-            className="flex-1 rounded px-5 py-3 text-base font-semibold cursor-pointer transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-[#f1c40f]/60 bg-transparent text-[#f1c40f] border border-[#f1c40f]"
+            className={`flex-1 rounded px-5 py-3 text-base font-semibold cursor-pointer transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-[#f1c40f]/60 ${
+              userBet.position 
+                ? 'bg-[#444444] text-[#f5f5f5]/50 cursor-not-allowed border border-[#f5f5f5]/20'
+                : 'bg-transparent text-[#f1c40f] border border-[#f1c40f]'
+            }`}
             onClick={() => handleShowBetInput("no")}
+            disabled={!!userBet.position}
+            title={userBet.position ? "You have already placed a bet" : "Bet NO"}
           >
-            No
+            {userBet.position === 'no' ? "Your Bet: NO" : "No"}
           </button>
         </div>
       )}
